@@ -1,0 +1,28 @@
+// -*- tab-width:2 ; indent-tabs-mode:nil -*-
+//:: cases Pathfinding
+//:: tools silicon
+//:: verdict Pass
+
+class Ref {
+
+	invariant ar != null ** N > 0 ** M > 0 ** \array(ar,M*N);
+	context (\forall* int i;0 <= i && i < M*N ; Perm(ar[i],1/2));
+	ensures  (\forall int i;0 <= i && i < M*N ; ar[i]==\old(ar[i]));
+	void path(int M,int N, int[M*N] ar){
+
+		par kern(int g = 0 .. M)
+		context (\forall* int k ; 0 <= k && k < N ; Perm(ar[g*N+k],1/4));
+		{
+			par group(int t = 0 .. N)
+			requires Perm(ar[g*N+t],1/4);
+			ensures t==0 ==> (\forall* int k; 0 <= k && k < N ; Perm(ar[g*N+k],1/4));
+			{
+				barrier(group)
+				requires Perm(ar[g*N+t],1/4);
+				ensures  t==0 ==> (\forall* int k; 0 <= k && k < N ; Perm(ar[g*N+k],1/4));
+				{
+				}
+			}
+		}
+	}
+}
