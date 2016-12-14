@@ -1,5 +1,7 @@
 dist/
 doc/
+core/
+main/
 tmp
 tmp.*
 vct-tool.jar
