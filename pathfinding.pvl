@@ -1,0 +1,92 @@
+// -*- tab-width:2 ; indent-tabs-mode:nil -*-
+//:: cases Pathfinding
+//:: tools silicon
+//:: verdict Pass
+
+class Ref {
+
+	invariant ar != null ** R > 0 ** C > 0 ** \array(ar,R*C) ** \array(gpuWall,R*C-C);
+	context (\forall* int i;0 <= i && i < R*C ; Perm(ar[i],1/2));
+	ensures  (\forall int i;0 <= i && i < R*C ; ar[i]==\old(ar[i]));
+	void path(int R,int C, int[R*C] ar, int[R*C-C] gpuWall){
+
+
+		par kern(int g = 0 .. R)
+		context (\forall* int k ; 0 <= k && k < R ; Perm(ar[g*R+k],1/4));
+		{
+
+			int[] prev;
+			int[] result;
+
+			par group(int t = 0 .. C)
+			requires Perm(ar[g*R+t],1/4);
+			ensures t==0 ==> (\forall* int k; 0 <= k && k < R ; Perm(ar[g*R+k],1/4));
+			{
+				//NOT KNOWN PARAMETERS
+				int border = 1;
+				int HALO = 1;
+				int iteration = 1;
+				int cols = C;
+				int rows = R;
+				int startStep = 86;
+
+				int BLOCK_SIZE = R;
+				int bx = g;
+				int tx = t;
+
+				int small_block_cols = BLOCK_SIZE - (iteration*HALO*2);
+
+				int blkX = (small_block_cols*bx) - border;
+				int blkXmax = blkX+BLOCK_SIZE-1;
+
+				int xidx = blkX+tx;
+
+				int validXmin = (blkX < 0) ? -blkX : 0;
+				int validXmax = (blkXmax > cols-1) ? BLOCK_SIZE-1-(blkXmax-cols+1) : BLOCK_SIZE-1;
+
+				int W = tx-1;
+				int E = tx+1;
+
+				W = (W < validXmin) ? validXmin : W;
+				E = (E > validXmax) ? validXmax : E;
+
+				boolean isValid = in_range(tx, validXmin, validXmax);
+
+				//missing some stuff
+
+				barrier(group)
+				requires Perm(ar[g*R+t],1/4);
+				ensures  t==0 ==> (\forall* int k; 0 <= k && k < R ; Perm(ar[g*R+k],1/4));
+				{
+				}
+
+				boolean computed;
+				int i = 0;
+				while(i < iteration){
+					computed = false;
+
+					if( in_range(tx, i+1, BLOCK_SIZE-i-2) && isValid )
+					{
+						computed = true;
+						int left = prev[W];
+						int up = prev[tx];
+						int right = prev[E];
+						int shortest = min(left, up);
+						shortest = min(shortest, right);
+
+						int index = cols*(startStep+i)+xidx;
+						result[tx] = shortest + gpuWall[index];
+					}
+				}
+			}
+		}
+	}
+
+	boolean in_range(int x, int min, int max){
+		return ((x)>=(min) && (x)<=(max));
+	}
+
+	int min(int a, int b){
+		return ((a)<=(b) ? (a) : (b));
+	}
+}
