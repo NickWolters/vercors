@@ -26,6 +26,8 @@ class Ref {
 				int startStep = 86;//not known set to 3
 
 				int BLOCK_SIZE = 16;
+
+
 				int bx = g;
 				int tx = t;
 
@@ -46,13 +48,18 @@ class Ref {
 				E = (E > validXmax) ? validXmax : E;
 
 				boolean isValid = in_range(tx, validXmin, validXmax);
+				boolean inRange1 = in_range(xidx, 0, cols-1);
+                if(inRange1)
+				{
+					prev[tx] = gpuSrc[xidx];
+				}
 
 				boolean computed;
 				int i = 0;
 				while(i < iteration){
 					computed = false;
-
-					if( in_range(tx, i+1, BLOCK_SIZE-i-2) && isValid )
+					boolean inRange2 = in_range(tx, i+1, BLOCK_SIZE-i-2);
+					if(inRange2 && isValid )
 					{
 						computed = true;
 						int left = prev[W];
@@ -64,12 +71,27 @@ class Ref {
 						int index = cols*(startStep+i)+xidx;
 						result[tx] = shortest + gpuWall[index];
 					}
+
+					i=i+1;
+
+					if(i!=iteration-1 && computed)
+					{
+						prev[tx] = result[tx];
+					}
+				}
+
+				// update the global memory
+				// after the last iteration, only threads coordinated within the
+				// small block perform the calculation and switch on "computed"
+				if (computed)
+				{
+					gpuResults[xidx] = result[tx];
 				}
 			}
 		}
 	}
 
-	boolean in_range(int x, int min, int max){
+	static boolean in_range(int x, int min, int max){
 		return ((x)>=(min) && (x)<=(max));
 	}
 
