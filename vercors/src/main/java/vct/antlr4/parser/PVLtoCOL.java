@@ -58,7 +58,7 @@ public class PVLtoCOL extends ANTLRtoCOL implements PVFullVisitor<ASTNode> {
     return unit;
   }
   public PVLtoCOL(ASTSequence<?> unit,Syntax syntax, String filename, BufferedTokenStream tokens,org.antlr.v4.runtime.Parser parser) {
-    super(unit, false, syntax, filename, tokens,parser,PVFullLexer.ID,PVFullLexer.class);
+    super(unit, false, syntax, filename, tokens,parser,PVFullLexer.Identifier,PVFullLexer.class);
   }
 
   @Override
@@ -783,7 +783,7 @@ public class PVLtoCOL extends ANTLRtoCOL implements PVFullVisitor<ASTNode> {
     ASTNode res=try_specials(tok.getText());
     if (res!=null) return res;
     switch(tok.getType()){
-    case PVFullLexer.ID:
+    case PVFullLexer.Identifier:
       return create.unresolved_name(tok.getText());
     case PVFullLexer.NUMBER:
       return create.constant(Integer.parseInt(tok.getText()));

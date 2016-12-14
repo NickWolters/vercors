@@ -1,10 +1,5 @@
 grammar omp;
 
-@header {
-package vct.antlr4.generated;
-}
-
-
 omp_pragma
  : omp_parallel
 // task generating constructs

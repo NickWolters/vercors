@@ -33,9 +33,14 @@ addons:
       - texlive-latex-extra
 
 script:
- - ant jar
-# - ant dist 
- - vct --exclude-suite=slow,medium,problem-fail,skip-travis --test="",$TRAVIS_BUILD_DIR/examples
+# compile the tool set
+ - ant compile
+# test the back ends
+ - vct --test=""
+# test one example in a way that show all error messages
+ - vct --silicon $TRAVIS_BUILD_DIR/examples/manual/fibonacci.pvl
+# test the remaining examples while hiding messages
+ - vct --exclude-suite=slow,medium,problem-fail,skip-travis --test=$TRAVIS_BUILD_DIR/examples
 
 #deploy:
 #  provider: releases

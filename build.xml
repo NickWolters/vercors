@@ -1,6 +1,6 @@
 <!-- -*- tab-width:2 ; indent-tabs-mode:nil -*- -->
 
-<project name="VerCors Tool" default="jar">
+<project name="VerCors Tool" default="compile">
 
   <!-- the dependencies are either in the deps sub-directory or two levels up -->  
   <condition property="deps" value="${basedir}/deps" else="${basedir}/../..">
@@ -12,21 +12,26 @@
     <os family="windows" />
   </condition>  
 
+  <condition property="sbtbuild" value="assembly"
+                                    else="packCopyDependencies">
+    <os family="windows" />
+  </condition>  
+
 	<property name="dist"         value="${basedir}/dist"/>
   <property environment="env"/>
 
   <target name="clean">
     <ant antfile="build.xml" dir="${basedir}/viper/viper-api" inheritAll="false" target="clean"/>
+    <exec dir="${basedir}/vercors" executable="${sbtcommand}"> <arg value="clean" /> </exec>
     <exec dir="${basedir}/viper/silver" executable="${sbtcommand}"> <arg value="clean" /> </exec>
     <exec dir="${basedir}/viper/silicon" executable="${sbtcommand}"> <arg value="clean" /> </exec>
     <exec dir="${basedir}/viper/carbon" executable="${sbtcommand}"> <arg value="clean" /> </exec>
+    <ant antfile="build.xml" dir="${basedir}/parsers" inheritAll="false" target="clean"/>
     <ant antfile="build.xml" dir="${basedir}/hre" inheritAll="false" target="clean"/>
-    <ant antfile="build.xml" dir="${basedir}/core" inheritAll="false" target="clean"/>
-    <ant antfile="build.xml" dir="${basedir}/main" inheritAll="false" target="clean"/>
     <delete dir="${basedir}/doc/api"/>
   </target>
   
-  <target name="assembly">
+  <target name="assembly" depends="compile">
   	<jar destfile="vct-tool.jar" >
       <manifest>
         <attribute name="Main-Class" value="vct.main.Main"/>
@@ -35,33 +40,37 @@
 		  <fileset dir="hre/bin">
 		  	<include name="**" />
 		  </fileset>
-		  <fileset dir="core/bin">
+		  <fileset dir="parsers/bin">
 		  	<include name="**" />
 		  </fileset>
-		  <fileset dir="main/bin">
+		  <fileset dir="vercors/target/scala-2.11/classes">
 		  	<include name="**" />
 		  </fileset>
 		  <fileset dir="viper/viper-api/bin">
 		  	<include name="**" />
 		  </fileset>
-		  <zipfileset src="core/libs/antlr-4.5-complete.jar" excludes="META-INF/*" />
+		  <zipfileset src="vercors/target/lib/antlr4-runtime-4.5.3.jar" excludes="META-INF/*" />
+		  <zipfileset src="vercors/target/lib/commons-lang3-3.1.jar" excludes="META-INF/*" />
+		  <zipfileset src="vercors/target/lib/commons-io-2.4.jar" excludes="META-INF/*" />
+		  <zipfileset src="vercors/target/lib/gson-2.8.0.jar" excludes="META-INF/*" />
+		  <zipfileset src="vercors/target/lib/scala-library-2.11.7.jar" excludes="META-INF/*" />
 		</jar>
   </target>
   
-  <target name="jar">
-    <ant antfile="build.xml" dir="${basedir}/viper/viper-api" inheritAll="false"/>
+  <target name="compile">
+    <ant antfile="build.xml" dir="${basedir}/viper/viper-api" inheritAll="false" target="compile"/>
+    <ant antfile="build.xml" dir="${basedir}/hre" inheritAll="false" target="compile"/>
+    <ant antfile="build.xml" dir="${basedir}/parsers" inheritAll="false" target="compile"/>
+    <exec dir="${basedir}/vercors" executable="${sbtcommand}"> <arg value="${sbtbuild}" /> </exec>
     <exec dir="${basedir}/viper/silver" executable="${sbtcommand}"> <arg value="compile" /> </exec>
     <exec dir="${basedir}/viper/silicon" executable="${sbtcommand}"> <arg value="assembly" /> </exec>
     <exec dir="${basedir}/viper/carbon" executable="${sbtcommand}"> <arg value="assembly" /> </exec>
-    <ant antfile="build.xml" dir="${basedir}/hre" inheritAll="false" target="jar"/>
-    <ant antfile="build.xml" dir="${basedir}/core" inheritAll="false" target="jar"/>
-    <ant antfile="build.xml" dir="${basedir}/main" inheritAll="false" target="jar"/>
   </target>
-  
-  <target name="doc" depends="jar">
+
+  <target name="doc" depends="compile">
     <!-- do not inline! -->
 		<antcall target="javadoc"/>
- </target>
+  </target>
 
   <target name="javadoc">
     <mkdir dir="${basedir}/doc/api"/>
@@ -77,16 +86,10 @@
       <fileset dir="${basedir}/hre/src" defaultexcludes="yes">
         <include name="**/*.java"/>
       </fileset>
-      <fileset dir="${basedir}/core/src" defaultexcludes="yes">
-        <include name="**/*.java"/>
-      </fileset>
-      <fileset dir="${basedir}/core/gensrc" defaultexcludes="yes">
+      <fileset dir="${basedir}/vercors/src/main/java" defaultexcludes="yes">
         <include name="**/*.java"/>
       </fileset>
       <fileset dir="${basedir}/viper/viper-api/src" defaultexcludes="yes">
-        <include name="**/*.java"/>
-      </fileset>
-      <fileset dir="${basedir}/main/src" defaultexcludes="yes">
         <include name="**/*.java"/>
       </fileset>
 
@@ -118,7 +121,7 @@
   </target>
 -->
   
-  <target name="dist" depends="jar,doc">
+  <target name="dist" depends="assembly,doc">
 	  <exec executable="git"
 	        failonerror="true"
 	        outputproperty="gitversion"

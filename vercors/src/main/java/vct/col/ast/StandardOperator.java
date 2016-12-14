@@ -276,7 +276,11 @@ public enum StandardOperator {
   /*
    * Get the values from an array as a sequence form a start upto an end
    */
-  Values(3)
+  Values(3),
+  /*
+   * Summation over a sequence.
+   */
+  FoldPlus(1)
   ;
 
   private final int arity;

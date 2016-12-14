@@ -29,33 +29,12 @@ else
 fi
 export TOOL_HOME
 
-if [ -d $VCT_HOME/hre/bin ] ; then
-    VCT_PATH=$VCT_HOME/hre/bin
-else
-    VCT_PATH=$VCT_HOME/hre/hre.jar
-fi
-if [ -d $VCT_HOME/viper/viper-api/bin ] ; then
-    VCT_PATH+=$SEP$VCT_HOME/viper/viper-api/bin
-else
-    echo "TODO: copy viper API lib"
-    exit 1
-fi
-if [ -d $VCT_HOME/core/bin ] ; then
-    VCT_PATH+=$SEP$VCT_HOME/core/bin
-else
-    VCT_PATH+=$SEP$VCT_HOME/core/vct-core.jar
-fi
-VCT_PATH+=$SEP$VCT_HOME/core/libs/antlr-4.5.3-complete.jar
-VCT_PATH+=$SEP$VCT_HOME/core/libs/gson-2.7.jar
-if [ -d $VCT_HOME/main/bin ] ; then
-    VCT_PATH+=$SEP$VCT_HOME/main/bin
-else 
-    VCT_PATH+=$SEP$VCT_HOME/main/vct-tool.jar 
-fi
-VCT_PATH+=$SEP$VCT_HOME/libs/commons-lang3-3.1/commons-lang3-3.1.jar
-VCT_PATH+=$SEP$VCT_HOME/libs/junit_4.11.0.jar
-VCT_PATH+=$SEP$VCT_HOME/libs/tempus-fugit-1.1.jar
-VCT_PATH+=$SEP$VCT_HOME/libs/hamcrest.core_1.3.0.jar
+VCT_PATH=$VCT_HOME/hre/bin
+VCT_PATH+=$SEP$VCT_HOME/viper/viper-api/bin
+VCT_PATH+=$SEP$VCT_HOME/parsers/bin
+VCT_PATH+=$SEP$VCT_HOME/vercors/target/scala-2.11/classes
+VCT_PATH+=$SEP$VCT_HOME/vercors/target/scala-2.11/vercors-assembly-0.1-SNAPSHOT.jar
+VCT_PATH+=$SEP$VCT_HOME/vercors/target/lib/*
 
 exec java -Xss128M -cp "$VCT_PATH" vct.main.Main "$@"
 

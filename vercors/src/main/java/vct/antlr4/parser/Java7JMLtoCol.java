@@ -48,11 +48,14 @@ public class Java7JMLtoCol extends ANTLRtoCOL implements Java7JMLVisitor<ASTNode
   private final int IntegerLiteral;
   
   private final int StringLiteral;
-
+  
+  private final int FloatingPointLiteral;
+  
   public Java7JMLtoCol(ASTSequence<?> unit,Syntax syntax, String filename, BufferedTokenStream tokens, Parser parser) {
     super(unit,true,syntax, filename, tokens, parser, Java7JMLLexer.Identifier,Java7JMLLexer.class);
     IntegerLiteral=getStaticInt(lexer_class,"IntegerLiteral");
     StringLiteral=getStaticInt(lexer_class,"StringLiteral");
+    FloatingPointLiteral=getStaticInt(lexer_class,"FloatingPointLiteral");
   }
 
   protected ASTNode convert_annotated(ParserRuleContext ctx) {
@@ -1068,6 +1071,9 @@ public class Java7JMLtoCol extends ANTLRtoCOL implements Java7JMLVisitor<ASTNode
     int t=tok.getType();
     if (t==IntegerLiteral){
       return create.constant(Integer.parseInt(tok.getText()));
+    }
+    if (t==FloatingPointLiteral){
+      return create.constant(Double.parseDouble(tok.getText()));
     }
     if (t==StringLiteral){
       String text=tok.getText();

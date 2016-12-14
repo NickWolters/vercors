@@ -153,9 +153,9 @@ typeArgs : '<' expr (',' expr)* '>';
 
 CONTAINER : 'seq' | 'set' | 'bag' ;
 
-identifier : ID | valReserved ;
+identifier : Identifier | valReserved ;
 
-ID  : ('a'..'z'|'A'..'Z') ('a'..'z'|'A'..'Z'|'0'..'9'|'_')*;
+Identifier  : ('a'..'z'|'A'..'Z') ('a'..'z'|'A'..'Z'|'0'..'9'|'_')*;
 NUMBER : ('0'..'9')+;
 
 COMMENT : '/*' .*? '*/' -> channel(COMMENT) ;

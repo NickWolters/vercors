@@ -543,6 +543,16 @@ public class SimpleTypeCheck extends RecursiveVisitor<Type> {
     
     
     switch(op){
+    case FoldPlus:{
+      Type t=e.getArg(0).getType();
+      if (t.isPrimitive(Sort.Sequence)){
+        t = (Type)((PrimitiveType) t).getArg(0);
+      } else {
+        Fail("argument of summation must be a sequence");
+      }
+      e.setType(t);
+      break;
+    }
     case IndependentOf:
     {
       e.setType(t1);

@@ -22,4 +22,35 @@ function get_Integer(o:Option[Int]) : Int
 }
 */
 
+domain VCTFloat {
+    function zero() : VCTFloat
+    function ffromint(i:Int) : VCTFloat
+    function float(ref:Ref): VCTFloat
+    function fsum(xs: Seq[VCTFloat]): VCTFloat
+    function fadd(f1 : VCTFloat,f2:VCTFloat):VCTFloat
+    
+    axiom commutative_add {
+        forall f1 : VCTFloat, f2 : VCTFloat :: fadd(f1,f2)==fadd(f2,f1)
+    }
+    
+    axiom zero_sum {
+        fsum(Seq[VCTFloat]())==zero()
+    }
+
+    axiom zero_int {
+        ffromint(0)==zero()
+    }
+    
+    axiom single_sum {
+      forall xs : Seq[VCTFloat], i:Int :: (0 <= i && i < |xs|) ==> (fsum(xs[i..i+1]) == xs[i])
+    }
+    
+    axiom single_sum_2 {
+      forall f : VCTFloat :: fsum(Seq(f)) == f
+    }
+    
+    axiom append_sum {
+      forall xs : Seq[VCTFloat], ys : Seq[VCTFloat] :: fsum(xs++ys) == fadd(fsum(xs),fsum(ys))
+    }
+}
 
