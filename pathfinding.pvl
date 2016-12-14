@@ -5,32 +5,27 @@
 
 class Ref {
 
-	invariant ar != null ** R > 0 ** C > 0 ** \array(ar,R*C) ** \array(gpuWall,R*C-C);
-	context (\forall* int i;0 <= i && i < R*C ; Perm(ar[i],1/2));
-	ensures  (\forall int i;0 <= i && i < R*C ; ar[i]==\old(ar[i]));
-	void path(int R,int C, int[R*C] ar, int[R*C-C] gpuWall){
+	invariant rows > 1 ** cols > 1 ** gpuSrc != null ** \array(gpuSrc,rows * cols) ** gpuWall != null ** \array(gpuWall,rows*cols-cols);
+	void path(int rows,int cols, int[rows*cols] gpuSrc, int[rows*cols-cols] gpuWall){
 
+		int[] gpuResults;
+		int[] outputBuffer;
 
-		par kern(int g = 0 .. R)
-		context (\forall* int k ; 0 <= k && k < R ; Perm(ar[g*R+k],1/4));
+		par kern(int g = 0 .. 3)
 		{
 
 			int[] prev;
 			int[] result;
 
-			par group(int t = 0 .. C)
-			requires Perm(ar[g*R+t],1/4);
-			ensures t==0 ==> (\forall* int k; 0 <= k && k < R ; Perm(ar[g*R+k],1/4));
+			par group(int t = 0 .. 15)
 			{
-				//NOT KNOWN PARAMETERS
-				int border = 1;
 				int HALO = 1;
-				int iteration = 1;
-				int cols = C;
-				int rows = R;
-				int startStep = 86;
+				//NOT KNOWN PARAMETERS
+				int border = 15;
+				int iteration = 1; //not known set to default 1
+				int startStep = 86;//not known set to 3
 
-				int BLOCK_SIZE = R;
+				int BLOCK_SIZE = 16;
 				int bx = g;
 				int tx = t;
 
@@ -51,14 +46,6 @@ class Ref {
 				E = (E > validXmax) ? validXmax : E;
 
 				boolean isValid = in_range(tx, validXmin, validXmax);
-
-				//missing some stuff
-
-				barrier(group)
-				requires Perm(ar[g*R+t],1/4);
-				ensures  t==0 ==> (\forall* int k; 0 <= k && k < R ; Perm(ar[g*R+k],1/4));
-				{
-				}
 
 				boolean computed;
 				int i = 0;
