@@ -9,11 +9,9 @@ class Ref {
 	void path(int rows,int cols, int[rows*cols] gpuSrc, int[rows*cols-cols] gpuWall){
 
 		int[] gpuResults;
-		int[] outputBuffer;
 
 		par kern(int g = 0 .. 3)
 		{
-
 			int[] prev;
 			int[] result;
 
@@ -23,7 +21,7 @@ class Ref {
 				//NOT KNOWN PARAMETERS
 				int border = 15;
 				int iteration = 1; //not known set to default 1
-				int startStep = 86;//not known set to 3
+				int startStep = 86; //not known set to 3
 
 				int BLOCK_SIZE = 16;
 
