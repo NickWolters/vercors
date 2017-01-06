@@ -5,95 +5,113 @@
 
 class Ref {
 
-	invariant rows > 1 ** cols > 1 ** gpuSrc != null ** \array(gpuSrc,rows * cols) ** gpuWall != null ** \array(gpuWall,rows*cols-cols);
-	void path(int rows,int cols, int[rows*cols] gpuSrc, int[rows*cols-cols] gpuWall){
+  invariant rows > 1 ** cols > 1 ** gpuSrc != null ** \array(gpuSrc,cols) ** gpuWall != null ** \array(gpuWall,rows*cols-cols) **prev != null ** \array(prev, 16) ** gpuResult != null ** \array(gpuResult, 16) ** gpuResults != null ** \array(gpuResults, cols);
+  void path(int rows,int cols, int[rows*cols] gpuSrc, int[rows*cols-cols] gpuWall, int[] prev, int[] gpuResults, int[] gpuResult){
 
-		int[] gpuResults;
+    par kern(int g = 0 .. 3)
+    {
 
-		par kern(int g = 0 .. 3)
-		{
-			int[] prev;
-			int[] result;
+      int HALO = 1;
+        //NOT KNOWN PARAMETERS
+      int border = 15;
+        int iteration = 1; //not known set to default 1
+        int startStep = 86; //not known set to 3
 
-			par group(int t = 0 .. 15)
-			{
-				int HALO = 1;
-				//NOT KNOWN PARAMETERS
-				int border = 15;
-				int iteration = 1; //not known set to default 1
-				int startStep = 86; //not known set to 3
-
-				int BLOCK_SIZE = 16;
+        int BLOCK_SIZE = 16;
 
 
-				int bx = g;
-				int tx = t;
+        int bx = g;
 
-				int small_block_cols = BLOCK_SIZE - (iteration*HALO*2);
+        int small_block_cols = BLOCK_SIZE - (iteration*HALO*2);
 
-				int blkX = (small_block_cols*bx) - border;
-				int blkXmax = blkX+BLOCK_SIZE-1;
+        int blkX = (small_block_cols*bx) - border;
+        invariant invPrevR( (\forall* int k; 0 <= k && k < 3 * 15 ; Perm(prev[k],1/4))){
+          par group(int t = 0 .. 15)
+          context Perm(gpuSrc[blkX+t],1);
+          {
+            invariant invPrevW( Perm(prev[t],1) ){
+              int tx = t;
 
-				int xidx = blkX+tx;
+              int blkXmax = blkX+BLOCK_SIZE-1;
 
-				int validXmin = (blkX < 0) ? -blkX : 0;
-				int validXmax = (blkXmax > cols-1) ? BLOCK_SIZE-1-(blkXmax-cols+1) : BLOCK_SIZE-1;
+              int xidx = blkX+tx;
 
-				int W = tx-1;
-				int E = tx+1;
+              int validXmin = (blkX < 0) ? -blkX : 0;
+              int validXmax = (blkXmax > cols-1) ? BLOCK_SIZE-1-(blkXmax-cols+1) : BLOCK_SIZE-1;
 
-				W = (W < validXmin) ? validXmin : W;
-				E = (E > validXmax) ? validXmax : E;
+              int W = tx-1;
+              int E = tx+1;
 
-				boolean isValid = in_range(tx, validXmin, validXmax);
-				boolean inRange1 = in_range(xidx, 0, cols-1);
+              W = (W < validXmin) ? validXmin : W;
+              E = (E > validXmax) ? validXmax : E;
+
+              boolean isValid = in_range(tx, validXmin, validXmax);
+              boolean inRange1 = in_range(xidx, 0, cols-1);
+              atomic(invPrevW){ 
                 if(inRange1)
-				{
-					prev[tx] = gpuSrc[xidx];
-				}
+                {
+                  prev[tx] = gpuSrc[xidx];
+                }
+              }
+              barrier(group)
+              {
+              }
 
-				boolean computed;
-				int i = 0;
-				while(i < iteration){
-					computed = false;
-					boolean inRange2 = in_range(tx, i+1, BLOCK_SIZE-i-2);
-					if(inRange2 && isValid )
-					{
-						computed = true;
-						int left = prev[W];
-						int up = prev[tx];
-						int right = prev[E];
-						int shortest = min(left, up);
-						shortest = min(shortest, right);
+              boolean computed = false;
+              int loopIndex = 0;
+              while(loopIndex < iteration){
+                computed = false;
+                atomic(invPrevR){ 
+                  boolean inRange2 = in_range(tx, loopIndex+1, BLOCK_SIZE-loopIndex-2);
+                  if(inRange2 && isValid )
+                  {
+                    computed = true;
+                    int left = prev[W];
+                    int up = prev[tx];
+                    int right = prev[E];
+                    int shortest = min(left, up);
+                    shortest = min(shortest, right);
 
-						int index = cols*(startStep+i)+xidx;
-						result[tx] = shortest + gpuWall[index];
-					}
+                    int index = cols*(startStep+loopIndex)+xidx;
+                    gpuResult[tx] = shortest + gpuWall[index];
+                  }
+                }
 
-					i=i+1;
+                barrier(group)
+                {
+                }
 
-					if(i!=iteration-1 && computed)
-					{
-						prev[tx] = result[tx];
-					}
-				}
+                atomic(invPrevW){ 
+                  if(computed)
+                  {
+                    prev[tx] = gpuResult[tx];
+                  }
+                }
+                
+                barrier(group)
+                {
+                }
+                loopIndex=loopIndex+1;
+              }
 
-				// update the global memory
-				// after the last iteration, only threads coordinated within the
-				// small block perform the calculation and switch on "computed"
-				if (computed)
-				{
-					gpuResults[xidx] = result[tx];
-				}
-			}
-		}
-	}
+        // update the global memory
+        // after the last iteration, only threads coordinated within the
+        // small block perform the calculation and switch on "computed"
+              if (computed)
+              {
+                gpuResults[xidx] = gpuResult[tx];
+              }
+            }
+          }
+        }
+      }
+    }
 
-	static boolean in_range(int x, int min, int max){
-		return ((x)>=(min) && (x)<=(max));
-	}
+    static boolean in_range(int x, int min, int max){
+      return ((x)>=(min) && (x)<=(max));
+    }
 
-	int min(int a, int b){
-		return ((a)<=(b) ? (a) : (b));
-	}
-}
+    int min(int a, int b){
+      return ((a)<=(b) ? (a) : (b));
+    }
+  }
