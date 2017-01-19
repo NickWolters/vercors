@@ -3,115 +3,140 @@
 //:: tools silicon
 //:: verdict Pass
 
-class Ref {
+class Pathfinding {
 
-  invariant rows > 1 ** cols > 1 ** gpuSrc != null ** \array(gpuSrc,cols) ** gpuWall != null ** \array(gpuWall,rows*cols-cols) **prev != null ** \array(prev, 16) ** gpuResult != null ** \array(gpuResult, 16) ** gpuResults != null ** \array(gpuResults, cols);
-  void path(int rows,int cols, int[rows*cols] gpuSrc, int[rows*cols-cols] gpuWall, int[] prev, int[] gpuResults, int[] gpuResult){
+  invariant iteration > 0;
+  invariant gpuWall != null ** \array(gpuWall, rows*(cols-1));
+  invariant gpuSrc != null ** \array(gpuSrc, cols);
+  invariant gpuResults != null ** \array(gpuResults, cols);
+  invariant cols > 0 ** rows > 0 ** startStep >= 0 ** border >= 0 ** HALO > 0;
+  invariant BLOCK_SIZE >= (iteration * 2) + border + LN - 1 ** BLOCK_SIZE > 0;
+  invariant BLOCK_SIZE - (iteration*2) - border + LN -1 <  cols;
+  // invariant cols*(startStep+iteration-1)+BLOCK_SIZE - (iteration*2) - border + LN -1 < rows*(cols-1) ** cols*(startStep+iteration-1)+BLOCK_SIZE - (iteration*2) - border + LN -1 >= 0;
+  invariant GN > 0 && LN > 0;
+  invariant LN <= cols && LN <= rows;
+  invariant r != null ** \array(r, LN);
+  invariant prev != null ** \array(prev, LN);
+  invariant HALO == 1;
 
-    par kern(int g = 0 .. 3)
+  context (\forall* int i; 0<=i && i < cols; Perm(gpuSrc[i], 1));
+  context (\forall* int i; 0<=i && i < cols; Perm(gpuResults[i], 1));
+  context (\forall* int i; 0<=i && i < rows*(cols-1); Perm(gpuWall[i], 1));
+  requires (\forall* int tx; 0<=tx && tx < LN; Perm(prev[tx], 1));
+  requires (\forall* int tx; 0<=tx && tx < LN; Perm(r[tx], 1));
+  void kernelMethod(int iteration,int[] gpuSrc, int[] gpuWall, int[] gpuResults, int cols, int rows, int startStep, int border, int HALO, int[] prev, int[] r, int GN, int LN, int BLOCK_SIZE){
+    int bx = 1;
     {
+      par loc(int tx = 0 .. LN)
+      context Perm(gpuSrc[BLOCK_SIZE - (iteration*2) - border + tx], 1/LN);
+      context Perm(gpuResults[BLOCK_SIZE - (iteration*2) - border + tx], 1/LN);
+      // context (\forall* int i; 0<=i && i < rows*(cols-1); Perm(gpuWall[i], 1/(rows*cols)));
+      // context Perm(gpuWall[tx], 1/LN);
+      // context (\forall* int loopIndex; 0<=loopIndex && loopIndex < iteration; Perm(gpuWall[cols*(startStep+loopIndex)+BLOCK_SIZE - (iteration*2) - border + tx], 1/LN));
+      // context (\forall* int ite; 0<=ite && ite < rows*(cols-1); Perm(gpuWall[ite], 1/LN));
+      requires Perm(prev[tx], 1);
+      requires Perm(r[tx], 1);
+      {
+        int small_block_cols  = BLOCK_SIZE - (iteration*2);
+        int blkX = BLOCK_SIZE - (iteration*2) - border;
+        // int blkX = (small_block_cols*bx) - border;
+        int blkXmax = blkX+BLOCK_SIZE-1;
+        int xidx = blkX+tx;
 
-      int HALO = 1;
-        //NOT KNOWN PARAMETERS
-      int border = 15;
-        int iteration = 1; //not known set to default 1
-        int startStep = 86; //not known set to 3
+        int validXmin = (blkX < 0) ? -blkX : 0;
+        int validXmax = (blkXmax > cols-1) ? BLOCK_SIZE-1-(blkXmax-cols+1) : BLOCK_SIZE-1;
 
-        int BLOCK_SIZE = 16;
+        int W = tx-1;
+        int E = tx+1;
 
+        W = (W < validXmin) ? validXmin : W;
+        E = (E > validXmax) ? validXmax : E;
 
-        int bx = g;
+        boolean isValid = in_range(tx, validXmin, validXmax);
+        boolean inRange1 = in_range(xidx, 0, cols-1);
+        if(inRange1)
+        {
+          prev[tx] = gpuSrc[xidx];
+        }
 
-        int small_block_cols = BLOCK_SIZE - (iteration*HALO*2);
+        barrier(loc)
+        {
+          requires Perm(prev[tx], 1);
+          ensures Perm(prev[W], 1/LN);
+          ensures Perm(prev[tx], 1/LN);
+          ensures Perm(prev[E], 1/LN);
 
-        int blkX = (small_block_cols*bx) - border;
-        invariant invPrevR( (\forall* int k; 0 <= k && k < 3 * 15 ; Perm(prev[k],1/4))){
-          par group(int t = 0 .. 15)
-          context Perm(gpuSrc[blkX+t],1);
+          ensures Perm(r[tx], 1);
+        }
+
+        boolean computed = false;
+        int loopIndex = 0;
+
+        loop_invariant Perm(prev[W], 1/LN);
+        loop_invariant Perm(prev[tx], 1/LN);
+        loop_invariant Perm(prev[E], 1/LN);
+        loop_invariant Perm(r[tx], 1);
+        while(loopIndex < iteration)
+        {
+          computed = false;
+          boolean inRange2 = in_range(tx, loopIndex+1, BLOCK_SIZE-loopIndex-2);
+          if(inRange2 && isValid )
           {
-            invariant invPrevW( Perm(prev[t],1) ){
-              int tx = t;
+            computed = true;
+            int left = prev[W];
+            int up = prev[tx];
+            int right = prev[E];
+            int shortest = min(left, up);
+            shortest = min(shortest, right);
 
-              int blkXmax = blkX+BLOCK_SIZE-1;
-
-              int xidx = blkX+tx;
-
-              int validXmin = (blkX < 0) ? -blkX : 0;
-              int validXmax = (blkXmax > cols-1) ? BLOCK_SIZE-1-(blkXmax-cols+1) : BLOCK_SIZE-1;
-
-              int W = tx-1;
-              int E = tx+1;
-
-              W = (W < validXmin) ? validXmin : W;
-              E = (E > validXmax) ? validXmax : E;
-
-              boolean isValid = in_range(tx, validXmin, validXmax);
-              boolean inRange1 = in_range(xidx, 0, cols-1);
-              atomic(invPrevW){ 
-                if(inRange1)
-                {
-                  prev[tx] = gpuSrc[xidx];
-                }
-              }
-              barrier(group)
-              {
-              }
-
-              boolean computed = false;
-              int loopIndex = 0;
-              while(loopIndex < iteration){
-                computed = false;
-                atomic(invPrevR){ 
-                  boolean inRange2 = in_range(tx, loopIndex+1, BLOCK_SIZE-loopIndex-2);
-                  if(inRange2 && isValid )
-                  {
-                    computed = true;
-                    int left = prev[W];
-                    int up = prev[tx];
-                    int right = prev[E];
-                    int shortest = min(left, up);
-                    shortest = min(shortest, right);
-
-                    int index = cols*(startStep+loopIndex)+xidx;
-                    gpuResult[tx] = shortest + gpuWall[index];
-                  }
-                }
-
-                barrier(group)
-                {
-                }
-
-                atomic(invPrevW){ 
-                  if(computed)
-                  {
-                    prev[tx] = gpuResult[tx];
-                  }
-                }
-                
-                barrier(group)
-                {
-                }
-                loopIndex=loopIndex+1;
-              }
-
-        // update the global memory
-        // after the last iteration, only threads coordinated within the
-        // small block perform the calculation and switch on "computed"
-              if (computed)
-              {
-                gpuResults[xidx] = gpuResult[tx];
-              }
+            int index = cols*(startStep+loopIndex)+xidx;
+              r[tx] = shortest + 1;//gpuWall[index];
             }
+
+            barrier(loc){
+              requires Perm(r[tx], 1);
+              requires Perm(prev[W], 1/LN);
+              requires Perm(prev[tx], 1/LN);
+              requires Perm(prev[E], 1/LN);
+              ensures Perm(prev[tx], 1);
+              ensures Perm(r[tx], 1/LN);
+            }
+
+            if(computed)
+            {
+              prev[tx] = r[tx];
+            }
+
+            barrier(loc)
+            {
+              requires Perm(prev[tx], 1);
+              requires Perm(r[tx], 1/LN);
+              ensures Perm(r[tx], 1);
+              ensures Perm(prev[W], 1/LN);
+              ensures Perm(prev[tx], 1/LN);
+              ensures Perm(prev[E], 1/LN);
+            }
+
+            loopIndex=loopIndex+1;
+          }
+          if (computed)
+          {
+            gpuResults[xidx] = r[tx];
           }
         }
       }
     }
 
+    ensures \result==(x>=min ** x<=max);
     static boolean in_range(int x, int min, int max){
       return ((x)>=(min) && (x)<=(max));
     }
 
-    int min(int a, int b){
+    ensures \result<=a ** \result <= b;
+    ensures a < b ==> \result == a;
+    ensures a > b ==> \result == b;
+    ensures a == b ==> (a == \result && b == \result);
+    static int min(int a, int b){
       return ((a)<=(b) ? (a) : (b));
     }
   }
